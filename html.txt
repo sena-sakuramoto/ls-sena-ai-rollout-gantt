@@ -112,6 +112,55 @@ const OWNERS = [
   { key: "Joint", label: "Joint" },
 ];
 
+// 目標シート（個人KPI）デフォルト
+const DEFAULT_GOALS = [
+  {
+    person: "sena",
+    role: "AI・DX戦略（建築）",
+    period: "2025-Q3",
+    revenueTarget: 12000000,
+    grossTarget: 4800000,
+    salary: 1500000,
+    skills: ["提案自動化v1出荷", "BIM即時3Dワークフロー", "見積AI PoC"],
+    principles: ["スピード", "再現性", "透明性"],
+    actions: [
+      { what: "MVP週次レビュー（提案/BIM/見積/写真）", cadence: "毎週", kpi: "各MVPの進捗100%" },
+      { what: "ナレッジ設計レビュー（LSと）", cadence: "隔週", kpi: "テンプレ改善2件/週" },
+      { what: "サイトIA→デザイン→CMS連携", cadence: "毎週", kpi: "M3達成" }
+    ]
+  },
+  {
+    person: "新井",
+    role: "LS（設計/施工PM）",
+    period: "2025-Q3",
+    revenueTarget: 9000000,
+    grossTarget: 3600000,
+    salary: 1200000,
+    skills: ["現調→3D→パース高速化", "撮影ルール整備"],
+    principles: ["正確性", "共有", "安全"],
+    actions: [
+      { what: "テンプレ記入ルール徹底", cadence: "毎日", kpi: "議事録/報告100%記入" },
+      { what: "BIM現場テスト", cadence: "10/06-10/10", kpi: "所要時間KPI提出" },
+      { what: "写真タグ運用", cadence: "毎現場", kpi: "撮影漏れ0件" }
+    ]
+  },
+  {
+    person: "たくみ",
+    role: "LS（代表/営業）",
+    period: "2025-Q3",
+    revenueTarget: 15000000,
+    grossTarget: 6000000,
+    salary: 2000000,
+    skills: ["新規開拓MVP運用", "7/3提案テンプレ最適化"],
+    principles: ["意思決定", "スピード", "顧客価値"],
+    actions: [
+      { what: "パイロット10社運用", cadence: "9/22-9/26", kpi: "反応率/商談化率レポート" },
+      { what: "提案パイロット2社", cadence: "9/22-9/26", kpi: "受注率指標提出" },
+      { what: "対外パートナー開拓", cadence: "毎週", kpi: "面談2件/週" }
+    ]
+  }
+];
+
 export default function App() {
   const [phaseFilter, setPhaseFilter] = useState(() => new Set(Object.keys(PHASE_COLORS)));
   const [ownerFilter, setOwnerFilter] = useState("All");
@@ -120,6 +169,37 @@ export default function App() {
   const [activeId, setActiveId] = useState(null);
   const chartRef = useRef(null);
   const containerRef = useRef(null);
+
+  // === 目標シート 用状態/関数 ===
+  const [goals, setGoals] = useState(DEFAULT_GOALS);
+  const [editGoals, setEditGoals] = useState(false);
+  const fmtJPY = (n) => (typeof n === 'number' ? `¥${n.toLocaleString('ja-JP')}` : '-');
+  const ratioColor = (r) => {
+    if (r == null || isNaN(r)) return '#e2e8f0';
+    if (r <= 0.35) return '#22c55e';
+    if (r <= 0.5) return '#f59e0b';
+    return '#ef4444';
+  };
+  const updateGoal = (idx, key, val) => {
+    setGoals(prev => prev.map((g,i)=> i===idx ? { ...g, [key]: val } : g));
+  };
+  const downloadGoalCSV = () => {
+    const headers = ["名前","役割","期間","売上目標","粗利目標","給与","給与/粗利","スキル","行動指針","アクション(what|cadence|kpi)"]; 
+    const lines = [headers.join(",")];
+    goals.forEach(g => {
+      const ratio = g.grossTarget ? (g.salary / g.grossTarget) : '';
+      const skills = (g.skills||[]).join(' / ');
+      const pr = (g.principles||[]).join(' / ');
+      const acts = (g.actions||[]).map(a=>`${a.what}|${a.cadence}|${a.kpi}`).join(' || ');
+      lines.push([g.person, g.role, g.period, g.revenueTarget, g.grossTarget, g.salary, ratio, `"${skills}"`, `"${pr}"`, `"${acts}"`].join(','));
+    });
+    const blob = new Blob(["﻿" + lines.join("
+")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "LS×sena_GoalSheet.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const tasks = useMemo(() => RAW_TASKS.map(t => ({
     ...t,
@@ -375,6 +455,92 @@ export default function App() {
               <li>受入基準：各タスクの<strong>成果物</strong>の有無で判定</li>
               <li>依存崩れは即リスケ（クリックでチェーンを確認）</li>
             </ul>
+          </div>
+        </div>
+
+        {/* 目標シート（個人KPI & アクション） */}
+        <div className="mt-8 p-5 rounded-2xl bg-white/5 border border-white/10">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">目標シート（個人KPI & アクション）</h2>
+            <div className="flex gap-2">
+              <button onClick={()=>setEditGoals(v=>!v)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition">{editGoals ? '編集終了' : '編集'}</button>
+              <button onClick={downloadGoalCSV} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition">CSV</button>
+            </div>
+          </div>
+          <div className="text-xs opacity-70 mt-1">前提：健全な<b>給料バランス</b>目安 = 給与 / 粗利 ≤ 35%（50%超は警戒）</div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="text-xs uppercase opacity-70">
+                <tr>
+                  <th className="py-2 pr-4">名前</th>
+                  <th className="py-2 pr-4">役割</th>
+                  <th className="py-2 pr-4">期間</th>
+                  <th className="py-2 pr-4">売上目標</th>
+                  <th className="py-2 pr-4">粗利目標</th>
+                  <th className="py-2 pr-4">給与</th>
+                  <th className="py-2 pr-4">給料バランス</th>
+                  <th className="py-2 pr-4">スキル</th>
+                  <th className="py-2 pr-4">行動指針</th>
+                </tr>
+              </thead>
+              <tbody>
+                {goals.map((g, idx)=>{
+                  const ratio = g.grossTarget ? g.salary / g.grossTarget : null;
+                  return (
+                    <React.Fragment key={g.person}>
+                      <tr className="border-t border-white/10">
+                        <td className="py-2 pr-4 font-medium">{g.person}</td>
+                        <td className="py-2 pr-4">{g.role}</td>
+                        <td className="py-2 pr-4">
+                          {editGoals ? (
+                            <input value={g.period||''} onChange={e=>updateGoal(idx,'period',e.target.value)} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
+                          ) : g.period}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {editGoals ? (
+                            <input type="number" value={g.revenueTarget||0} onChange={e=>updateGoal(idx,'revenueTarget',Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
+                          ) : fmtJPY(g.revenueTarget)}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {editGoals ? (
+                            <input type="number" value={g.grossTarget||0} onChange={e=>updateGoal(idx,'grossTarget',Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
+                          ) : fmtJPY(g.grossTarget)}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {editGoals ? (
+                            <input type="number" value={g.salary||0} onChange={e=>updateGoal(idx,'salary',Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
+                          ) : fmtJPY(g.salary)}
+                        </td>
+                        <td className="py-2 pr-4"><span style={{ color: ratioColor(ratio) }}>{ratio ? `${Math.round(ratio*100)}%` : '-'}</span></td>
+                        <td className="py-2 pr-4">
+                          <ul className="list-disc pl-5 space-y-0.5">
+                            {(g.skills||[]).map(s=> <li key={s} className="opacity-90">{s}</li>)}
+                          </ul>
+                        </td>
+                        <td className="py-2 pr-4">
+                          <ul className="list-disc pl-5 space-y-0.5">
+                            {(g.principles||[]).map(s=> <li key={s} className="opacity-90">{s}</li>)}
+                          </ul>
+                        </td>
+                      </tr>
+                      <tr className="bg-white/5">
+                        <td colSpan={9} className="py-3 px-3">
+                          <div className="text-sm font-medium">アクション</div>
+                          <ul className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
+                            {(g.actions||[]).map((a,i)=> (
+                              <li key={i} className="p-3 rounded-xl bg-white/5 border border-white/10">
+                                <div className="font-semibold text-sm">{a.what}</div>
+                                <div className="text-xs opacity-80 mt-0.5">頻度：{a.cadence}／KPI：{a.kpi}</div>
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
