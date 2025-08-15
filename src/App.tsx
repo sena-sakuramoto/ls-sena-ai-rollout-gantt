@@ -323,7 +323,7 @@ export default function App() {
   return (
     <div className="min-h-screen w-full bg-[#0b1020] text-white font-[Noto Sans JP],sans-serif">
       {/* ヘッダー */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-none mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">LS × sena｜AI導入マスタープラン・インタラクティブGantt</h1>
@@ -341,14 +341,18 @@ export default function App() {
           <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
             <div className="text-xs uppercase opacity-70 mb-2">フェーズ表示</div>
             <div className="flex flex-wrap gap-2">
-              {Object.keys(PHASE_COLORS).map(p => (
-                <button key={p} onClick={() => togglePhase(p)}
-                  className={`px-3 py-1.5 rounded-full text-sm border ${phaseFilter.has(p) ? 'bg-white/15 border-white/30' : 'bg-transparent border-white/10 opacity-60'}`}
-                  title={p}
-                >
-                  <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ background: PHASE_COLORS[p] }} />{p}
-                </button>
-              ))}
+              {Object.keys(PHASE_COLORS).map(p => {
+                const shortName = p.replace("P3 MVP-", "").replace("P0 ", "").replace("P1 ", "").replace("P2 ", "").replace("P4 ", "");
+                return (
+                  <button key={p} onClick={() => togglePhase(p)}
+                    className={`px-2 py-1.5 rounded-full text-xs border ${phaseFilter.has(p) ? 'bg-white/15 border-white/30' : 'bg-transparent border-white/10 opacity-60'} hover:bg-white/10 transition-all`}
+                    title={p}
+                  >
+                    <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: PHASE_COLORS[p] }} />
+                    <span className="truncate">{shortName}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -379,13 +383,14 @@ export default function App() {
         {/* ガント本体 */}
         <div ref={containerRef} className="mt-6 rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/5 to-white/0">
           <div className="px-5 py-3 text-sm opacity-90 border-b border-white/10">期間：{toISO(domainStart)} 〜 {toISO(domainEnd)}（{totalDays} 日）</div>
-          <div className="w-full h-[680px] px-2 py-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart ref={chartRef} data={chartData} layout="vertical" margin={{ top: 24, right: 40, bottom: 24, left: 220 }}>
+          <div className="w-full overflow-x-auto">
+            <div style={{ width: 'max(100%, 1200px)', height: Math.max(600, chartData.length * 40 + 100) + 'px' }} className="px-2 py-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart ref={chartRef} data={chartData} layout="vertical" margin={{ top: 30, right: 50, bottom: 30, left: 300 }}>
                 <XAxis type="number" domain={[0, totalDays]} ticks={xTicks} tickFormatter={(v: number) => {
                   const d = new Date(domainStart.getTime() + v * DAY); return fmt(d);
                 }} stroke="#cbd5e1" />
-                <YAxis type="category" dataKey="label" width={220} tick={{ fill: "#e2e8f0" }} />
+                <YAxis type="category" dataKey="label" width={280} tick={{ fill: "#e2e8f0", fontSize: 12 }} />
                 <Tooltip content={({ active, payload }: any) => {
                   if (!active || !payload || !payload.length) return null;
                   const p = payload[1]?.payload || payload[0]?.payload; // 0: offset, 1: duration
@@ -443,7 +448,8 @@ export default function App() {
                   })}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
@@ -487,7 +493,7 @@ export default function App() {
           <div className="text-xs opacity-70 mt-1">前提：健全な<b>給料バランス</b>目安 = 給与 / 粗利 ≤ 35%（50%超は警戒）</div>
           
           {/* カード形式での表示 */}
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {goals.map((g, idx) => {
               const ratio = g.grossTarget ? (g.salary / g.grossTarget) : null;
               return (
@@ -576,10 +582,10 @@ export default function App() {
                     <div className="space-y-3">
                       {(g.actions || []).map((a, i) => (
                         <div key={i} className="p-3 rounded-xl bg-gradient-to-r from-orange-500/10 to-orange-400/10 border border-orange-500/20">
-                          <div className="font-medium text-sm text-orange-200">{a.what}</div>
-                          <div className="text-xs opacity-80 mt-1">
-                            <span className="text-green-300">頻度: {a.cadence}</span> • 
-                            <span className="text-blue-300 ml-1">KPI: {a.kpi}</span>
+                          <div className="font-medium text-sm text-orange-200 break-words">{a.what}</div>
+                          <div className="text-xs opacity-80 mt-1 break-words">
+                            <div className="text-green-300 mb-1">頻度: {a.cadence}</div>
+                            <div className="text-blue-300">KPI: {a.kpi}</div>
                           </div>
                         </div>
                       ))}
