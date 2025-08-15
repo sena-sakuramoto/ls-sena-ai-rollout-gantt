@@ -1,24 +1,25 @@
 import React, { useMemo, useState, useRef } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from "recharts";
 import * as htmlToImage from "html-to-image";
+import { Task, Milestone, Owner, Goal, Action, ChartDataItem } from "./types";
 
 // ===== ヘルパー（日付） =====
 const DAY = 24 * 60 * 60 * 1000;
-const parseISO = (s) => {
+const parseISO = (s: string): Date => {
   // "YYYY-MM-DD" をタイムゾーンずれなくパース
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
-const toISO = (d) => {
+const toISO = (d: Date): string => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
 };
-const fmt = (d) => new Intl.DateTimeFormat("ja-JP", { month: "2-digit", day: "2-digit" }).format(d);
+const fmt = (d: Date): string => new Intl.DateTimeFormat("ja-JP", { month: "2-digit", day: "2-digit" }).format(d);
 
 // ===== データ：会議ベースの計画（担当配分：AI = sena／ナレッジ = LS） =====
-const RAW_TASKS = [
+const RAW_TASKS: Task[] = [
   // P0 ガバナンス
   { id: 1, phase: "P0 ガバナンス", name: "キックオフ＆KPI・ルール合意", owner: "Joint", ownerDisplay: "LS（たくみ）×sena", start: "2025-08-18", end: "2025-08-19", deliverable: "M0: 目的・KPI・データガバナンス合意書", deps: [] },
   { id: 2, phase: "P0 ガバナンス", name: "アクセス・権限・フォルダ標準化", owner: "LS", ownerDisplay: "LS（新井）", start: "2025-08-18", end: "2025-08-20", deliverable: "権限一覧・命名規則・フォルダ構成図", deps: [1] },
@@ -79,7 +80,7 @@ const RAW_TASKS = [
 ];
 
 // マイルストーン
-const MILESTONES = [
+const MILESTONES: Milestone[] = [
   { name: "M1 承認（KB/テンプレ）", date: "2025-08-29" },
   { name: "M3 Webローンチ", date: "2025-09-29" },
   { name: "M4 新規開拓パイロット", date: "2025-09-26" },
@@ -91,7 +92,7 @@ const MILESTONES = [
 ];
 
 // フェーズごとの色（Tailwind系の落ち着いた配色）
-const PHASE_COLORS = {
+const PHASE_COLORS: Record<string, string> = {
   "P0 ガバナンス": "#334155", // slate-700
   "P1 ナレッジ基盤": "#0ea5e9", // sky-500
   "P2 Web基盤": "#22c55e", // green-500
@@ -105,7 +106,7 @@ const PHASE_COLORS = {
 };
 
 // 所有者（担当）
-const OWNERS = [
+const OWNERS: Owner[] = [
   { key: "All", label: "すべて" },
   { key: "sena", label: "sena" },
   { key: "LS", label: "LS" },
@@ -113,7 +114,7 @@ const OWNERS = [
 ];
 
 // 目標シート（個人KPI）デフォルト
-const DEFAULT_GOALS = [
+const DEFAULT_GOALS: Goal[] = [
   {
     person: "sena",
     role: "AI・DX戦略（建築）",
@@ -162,35 +163,35 @@ const DEFAULT_GOALS = [
 ];
 
 export default function App() {
-  const [phaseFilter, setPhaseFilter] = useState(() => new Set(Object.keys(PHASE_COLORS)));
-  const [ownerFilter, setOwnerFilter] = useState("All");
-  const [query, setQuery] = useState("");
-  const [zoom, setZoom] = useState("week"); // "day" | "week" | "month"
-  const [activeId, setActiveId] = useState(null);
-  const chartRef = useRef(null);
-  const containerRef = useRef(null);
+  const [phaseFilter, setPhaseFilter] = useState<Set<string>>(() => new Set(Object.keys(PHASE_COLORS)));
+  const [ownerFilter, setOwnerFilter] = useState<string>("All");
+  const [query, setQuery] = useState<string>("");
+  const [zoom, setZoom] = useState<"day" | "week" | "month">("week");
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const chartRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // === 目標シート 用状態/関数 ===
-  const [goals, setGoals] = useState(DEFAULT_GOALS);
-  const [editGoals, setEditGoals] = useState(false);
-  const fmtJPY = (n) => (typeof n === 'number' ? `¥${n.toLocaleString('ja-JP')}` : '-');
-  const ratioColor = (r) => {
+  const [goals, setGoals] = useState<Goal[]>(DEFAULT_GOALS);
+  const [editGoals, setEditGoals] = useState<boolean>(false);
+  const fmtJPY = (n: number): string => (typeof n === 'number' ? `¥${n.toLocaleString('ja-JP')}` : '-');
+  const ratioColor = (r: number | null): string => {
     if (r == null || isNaN(r)) return '#e2e8f0';
     if (r <= 0.35) return '#22c55e';
     if (r <= 0.5) return '#f59e0b';
     return '#ef4444';
   };
-  const updateGoal = (idx, key, val) => {
-    setGoals(prev => prev.map((g,i)=> i===idx ? { ...g, [key]: val } : g));
+  const updateGoal = (idx: number, key: keyof Goal, val: any) => {
+    setGoals(prev => prev.map((g, i) => i === idx ? { ...g, [key]: val } : g));
   };
   const downloadGoalCSV = () => {
-    const headers = ["名前","役割","期間","売上目標","粗利目標","給与","給与/粗利","スキル","行動指針","アクション(what|cadence|kpi)"]; 
+    const headers = ["名前", "役割", "期間", "売上目標", "粗利目標", "給与", "給与/粗利", "スキル", "行動指針", "アクション(what|cadence|kpi)"];
     const lines = [headers.join(",")];
     goals.forEach(g => {
       const ratio = g.grossTarget ? (g.salary / g.grossTarget) : '';
-      const skills = (g.skills||[]).join(' / ');
-      const pr = (g.principles||[]).join(' / ');
-      const acts = (g.actions||[]).map(a=>`${a.what}|${a.cadence}|${a.kpi}`).join(' || ');
+      const skills = (g.skills || []).join(' / ');
+      const pr = (g.principles || []).join(' / ');
+      const acts = (g.actions || []).map(a => `${a.what}|${a.cadence}|${a.kpi}`).join(' || ');
       lines.push([g.person, g.role, g.period, g.revenueTarget, g.grossTarget, g.salary, ratio, `"${skills}"`, `"${pr}"`, `"${acts}"`].join(','));
     });
     const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -217,8 +218,8 @@ export default function App() {
 
   // 期間（ドメイン）
   const { domainStart, domainEnd } = useMemo(() => {
-    const minStart = filtered.reduce((acc, t) => acc < t.startDate ? acc : t.startDate, filtered[0]?.startDate || parseISO("2025-08-18"));
-    const maxEnd = filtered.reduce((acc, t) => acc > t.endDate ? acc : t.endDate, filtered[0]?.endDate || parseISO("2025-11-14"));
+    const minStart = filtered.reduce((acc, t) => acc < t.startDate! ? acc : t.startDate!, filtered[0]?.startDate || parseISO("2025-08-18"));
+    const maxEnd = filtered.reduce((acc, t) => acc > t.endDate! ? acc : t.endDate!, filtered[0]?.endDate || parseISO("2025-11-14"));
     // 余白を追加
     const pad = 2; // 2日
     const ds = new Date(minStart.getTime() - pad * DAY);
@@ -227,13 +228,13 @@ export default function App() {
   }, [filtered]);
 
   // ガント描画用データ（積み上げ：offset + duration）
-  const chartData = useMemo(() => {
+  const chartData: ChartDataItem[] = useMemo(() => {
     const base = domainStart.getTime();
     return filtered
-      .sort((a, b) => a.startDate - b.startDate || a.id - b.id)
+      .sort((a, b) => a.startDate!.getTime() - b.startDate!.getTime() || a.id - b.id)
       .map((t, i) => {
-        const offsetDays = Math.max(0, Math.round((t.startDate.getTime() - base) / DAY));
-        const durationDays = Math.max(1, Math.round((t.endDate.getTime() - t.startDate.getTime()) / DAY) + 1);
+        const offsetDays = Math.max(0, Math.round((t.startDate!.getTime() - base) / DAY));
+        const durationDays = Math.max(1, Math.round((t.endDate!.getTime() - t.startDate!.getTime()) / DAY) + 1);
         const label = `${t.id} ${t.name}（${t.ownerDisplay}）`;
         return {
           ...t,
@@ -254,12 +255,12 @@ export default function App() {
     const stack = [activeId];
     // 上流（依存元）を辿る
     while (stack.length) {
-      const cur = stack.pop();
+      const cur = stack.pop()!;
       const t = id2task.get(cur);
       (t?.deps || []).forEach(d => { if (!chain.has(d)) { chain.add(d); stack.push(d); } });
     }
     // 下流（依存先）も辿る
-    const forward = (id) => {
+    const forward = (id: number) => {
       tasks.forEach(tt => { if (tt.deps.includes(id) && !chain.has(tt.id)) { chain.add(tt.id); forward(tt.id); } });
     };
     forward(activeId);
@@ -286,7 +287,7 @@ export default function App() {
 
   // CSVダウンロード
   const downloadCSV = () => {
-    const headers = ["ID","フェーズ","タスク","担当","開始日","終了日","成果物/受入基準","依存"];
+    const headers = ["ID", "フェーズ", "タスク", "担当", "開始日", "終了日", "成果物/受入基準", "依存"];
     const lines = [headers.join(",")];
     RAW_TASKS.forEach(t => {
       const deps = t.deps?.join(" ") || "";
@@ -309,7 +310,7 @@ export default function App() {
   };
 
   // フェーズトグル
-  const togglePhase = (p) => {
+  const togglePhase = (p: string) => {
     const next = new Set(phaseFilter);
     if (next.has(p)) next.delete(p); else next.add(p);
     setPhaseFilter(next);
@@ -317,7 +318,7 @@ export default function App() {
 
   // 本日線
   const today = parseISO("2025-08-14");
-  const todayX = Math.round((today.getTime() - domainStart.getTime())/DAY);
+  const todayX = Math.round((today.getTime() - domainStart.getTime()) / DAY);
 
   return (
     <div className="min-h-screen w-full bg-[#0b1020] text-white font-[Noto Sans JP],sans-serif">
@@ -356,19 +357,19 @@ export default function App() {
             <div className="flex gap-2 flex-wrap">
               {OWNERS.map(o => (
                 <button key={o.key} onClick={() => setOwnerFilter(o.key)}
-                  className={`px-3 py-1.5 rounded-full text-sm border ${ownerFilter===o.key ? 'bg-white/15 border-white/30' : 'bg-transparent border-white/10 opacity-60'}`}>{o.label}</button>
+                  className={`px-3 py-1.5 rounded-full text-sm border ${ownerFilter === o.key ? 'bg-white/15 border-white/30' : 'bg-transparent border-white/10 opacity-60'}`}>{o.label}</button>
               ))}
             </div>
             <div className="mt-3">
-              <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="タスク／ID／フェーズ検索" className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/10 outline-none" />
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="タスク／ID／フェーズ検索" className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/10 outline-none" />
             </div>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
             <div className="text-xs uppercase opacity-70 mb-2">表示スケール</div>
             <div className="flex gap-2">
-              {(["day","week","month"]).map(z => (
-                <button key={z} onClick={()=>setZoom(z)} className={`px-3 py-1.5 rounded-full text-sm border ${zoom===z ? 'bg-white/15 border-white/30' : 'bg-transparent border-white/10 opacity-60'}`}>{z}</button>
+              {(["day", "week", "month"] as const).map(z => (
+                <button key={z} onClick={() => setZoom(z)} className={`px-3 py-1.5 rounded-full text-sm border ${zoom === z ? 'bg-white/15 border-white/30' : 'bg-transparent border-white/10 opacity-60'}`}>{z}</button>
               ))}
             </div>
             <div className="text-xs opacity-70 mt-3">クリックで依存チェーンをハイライト</div>
@@ -381,11 +382,11 @@ export default function App() {
           <div className="w-full h-[680px] px-2 py-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart ref={chartRef} data={chartData} layout="vertical" margin={{ top: 24, right: 40, bottom: 24, left: 220 }}>
-                <XAxis type="number" domain={[0, totalDays]} ticks={xTicks} tickFormatter={(v)=>{
-                  const d = new Date(domainStart.getTime() + v*DAY); return fmt(d);
+                <XAxis type="number" domain={[0, totalDays]} ticks={xTicks} tickFormatter={(v: number) => {
+                  const d = new Date(domainStart.getTime() + v * DAY); return fmt(d);
                 }} stroke="#cbd5e1" />
                 <YAxis type="category" dataKey="label" width={220} tick={{ fill: "#e2e8f0" }} />
-                <Tooltip content={({ active, payload }) => {
+                <Tooltip content={({ active, payload }: any) => {
                   if (!active || !payload || !payload.length) return null;
                   const p = payload[1]?.payload || payload[0]?.payload; // 0: offset, 1: duration
                   if (!p) return null;
@@ -405,8 +406,8 @@ export default function App() {
                   <ReferenceLine x={todayX} stroke="#e11d48" strokeDasharray="3 3" label={{ value: "Today", position: "top", fill: "#e11d48" }} />
                 )}
                 {/* マイルストーン */}
-                {MILESTONES.map((m, i) => {
-                  const x = Math.round((parseISO(m.date).getTime() - domainStart.getTime())/DAY);
+                {MILESTONES.map((m: Milestone) => {
+                  const x = Math.round((parseISO(m.date).getTime() - domainStart.getTime()) / DAY);
                   if (x < 0 || x > totalDays) return null;
                   return <ReferenceLine key={m.name} x={x} stroke="#94a3b8" strokeDasharray="4 2" label={{ value: m.name, position: "top", fill: "#94a3b8", fontSize: 12 }} />
                 })}
@@ -462,7 +463,7 @@ export default function App() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">目標シート（個人KPI & アクション）</h2>
             <div className="flex gap-2">
-              <button onClick={()=>setEditGoals(v=>!v)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition">{editGoals ? '編集終了' : '編集'}</button>
+              <button onClick={() => setEditGoals(v => !v)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition">{editGoals ? '編集終了' : '編集'}</button>
               <button onClick={downloadGoalCSV} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition">CSV</button>
             </div>
           </div>
@@ -483,40 +484,45 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {goals.map((g, idx)=>(
+                {goals.map((g, idx) => (
                   <React.Fragment key={g.person}>
                     <tr className="border-t border-white/10">
                       <td className="py-2 pr-4 font-medium">{g.person}</td>
                       <td className="py-2 pr-4">{g.role}</td>
                       <td className="py-2 pr-4">
                         {editGoals ? (
-                          <input value={g.period||''} onChange={e=>updateGoal(idx,'period',e.target.value)} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
+                          <input value={g.period || ''} onChange={e => updateGoal(idx, 'period', e.target.value)} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
                         ) : g.period}
                       </td>
                       <td className="py-2 pr-4">
                         {editGoals ? (
-                          <input type="number" value={g.revenueTarget||0} onChange={e=>updateGoal(idx,'revenueTarget',Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
+                          <input type="number" value={g.revenueTarget || 0} onChange={e => updateGoal(idx, 'revenueTarget', Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
                         ) : fmtJPY(g.revenueTarget)}
                       </td>
                       <td className="py-2 pr-4">
                         {editGoals ? (
-                          <input type="number" value={g.grossTarget||0} onChange={e=>updateGoal(idx,'grossTarget',Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
+                          <input type="number" value={g.grossTarget || 0} onChange={e => updateGoal(idx, 'grossTarget', Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
                         ) : fmtJPY(g.grossTarget)}
                       </td>
                       <td className="py-2 pr-4">
                         {editGoals ? (
-                          <input type="number" value={g.salary||0} onChange={e=>updateGoal(idx,'salary',Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
+                          <input type="number" value={g.salary || 0} onChange={e => updateGoal(idx, 'salary', Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
                         ) : fmtJPY(g.salary)}
                       </td>
-                      <td className="py-2 pr-4"><span style={{ color: ratioColor(ratio) }}>{ratio ? `${Math.round(ratio*100)}%` : '-'}</span></td>
+                      <td className="py-2 pr-4">
+                        {(() => {
+                          const ratio = g.grossTarget ? (g.salary / g.grossTarget) : null;
+                          return <span style={{ color: ratioColor(ratio) }}>{ratio ? `${Math.round(ratio * 100)}%` : '-'}</span>;
+                        })()}
+                      </td>
                       <td className="py-2 pr-4">
                         <ul className="list-disc pl-5 space-y-0.5">
-                          {(g.skills||[]).map(s=> <li key={s} className="opacity-90">{s}</li>)}
+                          {(g.skills || []).map(s => <li key={s} className="opacity-90">{s}</li>)}
                         </ul>
                       </td>
                       <td className="py-2 pr-4">
                         <ul className="list-disc pl-5 space-y-0.5">
-                          {(g.principles||[]).map(s=> <li key={s} className="opacity-90">{s}</li>)}
+                          {(g.principles || []).map(s => <li key={s} className="opacity-90">{s}</li>)}
                         </ul>
                       </td>
                     </tr>
@@ -524,7 +530,7 @@ export default function App() {
                       <td colSpan={9} className="py-3 px-3">
                         <div className="text-sm font-medium">アクション</div>
                         <ul className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-                          {(g.actions||[]).map((a,i)=> (
+                          {(g.actions || []).map((a, i) => (
                             <li key={i} className="p-3 rounded-xl bg-white/5 border border-white/10">
                               <div className="font-semibold text-sm">{a.what}</div>
                               <div className="text-xs opacity-80 mt-0.5">頻度：{a.cadence}／KPI：{a.kpi}</div>
@@ -549,11 +555,11 @@ export default function App() {
         * { font-family: 'Noto Sans JP', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji','Segoe UI Emoji'; }
         @media print {
           body { background: white; color: #111; }
-          .bg-\[\#0b1020\] { background: white !important; }
+          .bg-\\[\\#0b1020\\] { background: white !important; }
           .text-white { color: #111 !important; }
-          .border-white\/10 { border-color: #e5e7eb !important; }
-          .bg-white\/5 { background: #fff !important; }
-          .bg-white\/10, .bg-white\/15, .bg-white\/20 { background: #fff !important; }
+          .border-white\\/10 { border-color: #e5e7eb !important; }
+          .bg-white\\/5 { background: #fff !important; }
+          .bg-white\\/10, .bg-white\\/15, .bg-white\\/20 { background: #fff !important; }
         }
       `}</style>
     </div>
