@@ -76,7 +76,7 @@ const RAW_TASKS: Task[] = [
   { id: 37, phase: "P4 展開", name: "KPI測定・Go/No-Go審査", owner: "LS", ownerDisplay: "LS（たくみ）", start: "2025-11-10", end: "2025-11-14", deliverable: "M8: KPI達成判断・次期計画", deps: [36] },
 
   // スポット
-  { id: 38, phase: "スポット", name: "蕨PJ: ガス経路図ドラフト（座席配管）", owner: "sena", ownerDisplay: "sena", start: "2025-08-18", end: "2025-08-22", deliverable: "配管経路図（暫定）", deps: [] },
+  { id: 38, phase: "スポット", name: "蕨PJ: ガス経路図作成（座席配管）", owner: "sena", ownerDisplay: "sena", start: "2025-08-18", end: "2025-08-22", deliverable: "配管経路図", deps: [] },
 ];
 
 // マイルストーン
@@ -406,10 +406,27 @@ export default function App() {
                   <ReferenceLine x={todayX} stroke="#e11d48" strokeDasharray="3 3" label={{ value: "Today", position: "top", fill: "#e11d48" }} />
                 )}
                 {/* マイルストーン */}
-                {MILESTONES.map((m: Milestone) => {
+                {MILESTONES.map((m: Milestone, index: number) => {
                   const x = Math.round((parseISO(m.date).getTime() - domainStart.getTime()) / DAY);
                   if (x < 0 || x > totalDays) return null;
-                  return <ReferenceLine key={m.name} x={x} stroke="#94a3b8" strokeDasharray="4 2" label={{ value: m.name, position: "top", fill: "#94a3b8", fontSize: 12 }} />
+                  
+                  // ラベルの重複を避けるため、Y位置を調整
+                  const offset = (index % 3) * 15; // 3つのレベルで配置
+                  const position = index % 2 === 0 ? "top" : "bottom";
+                  
+                  return <ReferenceLine 
+                    key={m.name} 
+                    x={x} 
+                    stroke="#94a3b8" 
+                    strokeDasharray="4 2" 
+                    label={{ 
+                      value: m.name, 
+                      position: position,
+                      fill: "#94a3b8", 
+                      fontSize: 11,
+                      offset: offset
+                    }} 
+                  />
                 })}
                 {/* オフセット（不可視） */}
                 <Bar dataKey="offset" stackId="a" fill="transparent" />
@@ -468,81 +485,109 @@ export default function App() {
             </div>
           </div>
           <div className="text-xs opacity-70 mt-1">前提：健全な<b>給料バランス</b>目安 = 給与 / 粗利 ≤ 35%（50%超は警戒）</div>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase opacity-70">
-                <tr>
-                  <th className="py-2 pr-4">名前</th>
-                  <th className="py-2 pr-4">役割</th>
-                  <th className="py-2 pr-4">期間</th>
-                  <th className="py-2 pr-4">売上目標</th>
-                  <th className="py-2 pr-4">粗利目標</th>
-                  <th className="py-2 pr-4">給与</th>
-                  <th className="py-2 pr-4">給料バランス</th>
-                  <th className="py-2 pr-4">スキル</th>
-                  <th className="py-2 pr-4">行動指針</th>
-                </tr>
-              </thead>
-              <tbody>
-                {goals.map((g, idx) => (
-                  <React.Fragment key={g.person}>
-                    <tr className="border-t border-white/10">
-                      <td className="py-2 pr-4 font-medium">{g.person}</td>
-                      <td className="py-2 pr-4">{g.role}</td>
-                      <td className="py-2 pr-4">
-                        {editGoals ? (
-                          <input value={g.period || ''} onChange={e => updateGoal(idx, 'period', e.target.value)} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
-                        ) : g.period}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {editGoals ? (
-                          <input type="number" value={g.revenueTarget || 0} onChange={e => updateGoal(idx, 'revenueTarget', Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
-                        ) : fmtJPY(g.revenueTarget)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {editGoals ? (
-                          <input type="number" value={g.grossTarget || 0} onChange={e => updateGoal(idx, 'grossTarget', Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-32" />
-                        ) : fmtJPY(g.grossTarget)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {editGoals ? (
-                          <input type="number" value={g.salary || 0} onChange={e => updateGoal(idx, 'salary', Number(e.target.value))} className="px-2 py-1 rounded bg-white/10 border border-white/10 w-28" />
-                        ) : fmtJPY(g.salary)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {(() => {
-                          const ratio = g.grossTarget ? (g.salary / g.grossTarget) : null;
-                          return <span style={{ color: ratioColor(ratio) }}>{ratio ? `${Math.round(ratio * 100)}%` : '-'}</span>;
-                        })()}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <ul className="list-disc pl-5 space-y-0.5">
-                          {(g.skills || []).map(s => <li key={s} className="opacity-90">{s}</li>)}
-                        </ul>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <ul className="list-disc pl-5 space-y-0.5">
-                          {(g.principles || []).map(s => <li key={s} className="opacity-90">{s}</li>)}
-                        </ul>
-                      </td>
-                    </tr>
-                    <tr className="bg-white/5">
-                      <td colSpan={9} className="py-3 px-3">
-                        <div className="text-sm font-medium">アクション</div>
-                        <ul className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-                          {(g.actions || []).map((a, i) => (
-                            <li key={i} className="p-3 rounded-xl bg-white/5 border border-white/10">
-                              <div className="font-semibold text-sm">{a.what}</div>
-                              <div className="text-xs opacity-80 mt-0.5">頻度：{a.cadence}／KPI：{a.kpi}</div>
-                            </li>
-                          ))}
-                        </ul>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+          
+          {/* カード形式での表示 */}
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {goals.map((g, idx) => {
+              const ratio = g.grossTarget ? (g.salary / g.grossTarget) : null;
+              return (
+                <div key={g.person} className="p-6 rounded-2xl bg-white/10 border border-white/20 hover:bg-white/15 transition-all">
+                  {/* ヘッダー */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">{g.person}</h3>
+                      <p className="text-sm opacity-80">{g.role}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs opacity-70">給料バランス</div>
+                      <div className="text-lg font-bold" style={{ color: ratioColor(ratio) }}>
+                        {ratio ? `${Math.round(ratio * 100)}%` : '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* KPI数値 */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                      <div className="text-xs opacity-70 mb-1">期間</div>
+                      {editGoals ? (
+                        <input value={g.period || ''} onChange={e => updateGoal(idx, 'period', e.target.value)} 
+                          className="w-full px-2 py-1 rounded bg-white/10 border border-white/10 text-sm" />
+                      ) : (
+                        <div className="font-medium">{g.period}</div>
+                      )}
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                      <div className="text-xs opacity-70 mb-1">売上目標</div>
+                      {editGoals ? (
+                        <input type="number" value={g.revenueTarget || 0} onChange={e => updateGoal(idx, 'revenueTarget', Number(e.target.value))} 
+                          className="w-full px-2 py-1 rounded bg-white/10 border border-white/10 text-sm" />
+                      ) : (
+                        <div className="font-medium text-green-400">{fmtJPY(g.revenueTarget)}</div>
+                      )}
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                      <div className="text-xs opacity-70 mb-1">粗利目標</div>
+                      {editGoals ? (
+                        <input type="number" value={g.grossTarget || 0} onChange={e => updateGoal(idx, 'grossTarget', Number(e.target.value))} 
+                          className="w-full px-2 py-1 rounded bg-white/10 border border-white/10 text-sm" />
+                      ) : (
+                        <div className="font-medium text-blue-400">{fmtJPY(g.grossTarget)}</div>
+                      )}
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                      <div className="text-xs opacity-70 mb-1">給与</div>
+                      {editGoals ? (
+                        <input type="number" value={g.salary || 0} onChange={e => updateGoal(idx, 'salary', Number(e.target.value))} 
+                          className="w-full px-2 py-1 rounded bg-white/10 border border-white/10 text-sm" />
+                      ) : (
+                        <div className="font-medium text-yellow-400">{fmtJPY(g.salary)}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* スキル */}
+                  <div className="mb-4">
+                    <div className="text-sm font-medium mb-2 text-purple-300">重点スキル</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(g.skills || []).map(s => (
+                        <span key={s} className="px-2 py-1 rounded-full bg-purple-500/20 text-purple-200 text-xs">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 行動指針 */}
+                  <div className="mb-4">
+                    <div className="text-sm font-medium mb-2 text-cyan-300">行動指針</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(g.principles || []).map(s => (
+                        <span key={s} className="px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-200 text-xs">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* アクション */}
+                  <div>
+                    <div className="text-sm font-medium mb-3 text-orange-300">アクション</div>
+                    <div className="space-y-3">
+                      {(g.actions || []).map((a, i) => (
+                        <div key={i} className="p-3 rounded-xl bg-gradient-to-r from-orange-500/10 to-orange-400/10 border border-orange-500/20">
+                          <div className="font-medium text-sm text-orange-200">{a.what}</div>
+                          <div className="text-xs opacity-80 mt-1">
+                            <span className="text-green-300">頻度: {a.cadence}</span> • 
+                            <span className="text-blue-300 ml-1">KPI: {a.kpi}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
